@@ -2,8 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - aap-bootstrap-rbac.yaml           # wave 31 — SA + Role + RoleBinding
-  - aap-connection-secret-job.yaml    # wave 32 — PreSync Job: builds aap-controller-connection secret
+  - aap-connection-secret-job.yaml    # PreSync Job: builds aap-controller-connection secret
   - aap-project.yaml                  # wave 33 — AnsibleProject CRD
   - aap-inventory.yaml                # wave 33 — AnsibleInventory CRD
   - aap-job-template.yaml             # wave 34 — JobTemplate CRD
