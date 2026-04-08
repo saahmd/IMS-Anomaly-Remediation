@@ -1,0 +1,23 @@
+apiVersion: tower.ansible.com/v1alpha1
+kind: JobTemplate
+metadata:
+  name: ims-remediation
+  namespace: aap
+  annotations:
+    argocd.argoproj.io/sync-wave: "34"
+spec:
+  connection_secret: aap-controller-connection
+  name: "IMS Remediation - Lightspeed Playbook Generator"
+  description: >-
+    Calls the Ansible Lightspeed API with lightspeed_prompt and returns
+    a generated playbook. Triggered by Kafka EDA events.
+  job_type: run
+  organization: Default
+  project: IMS Remediation
+  inventory: IMS Remediation Inventory
+  playbook: automation/ansible/playbooks/ims-remediation.yaml
+  ask_variables_on_launch: true
+  extra_vars: |
+    input_lightspeed_url: https://c.ai.ansible.redhat.com/api/v0/ai/generations/
+    lightspeed_wca_token: ""
+    lightspeed_prompt: ""

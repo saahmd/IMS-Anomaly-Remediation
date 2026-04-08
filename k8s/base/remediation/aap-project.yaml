@@ -1,0 +1,16 @@
+apiVersion: tower.ansible.com/v1alpha1
+kind: AnsibleProject
+metadata:
+  name: ims-remediation
+  namespace: aap
+  annotations:
+    argocd.argoproj.io/sync-wave: "33"
+spec:
+  connection_secret: aap-controller-connection
+  name: IMS Remediation
+  description: "IMS Remediation automation — Ansible Lightspeed playbook generator"
+  scm_type: git
+  scm_url: "https://github.com/saahmd/IMS-Anomaly-Remediation.git"
+  scm_branch: main
+  organization: Default
+  update_on_launch: true

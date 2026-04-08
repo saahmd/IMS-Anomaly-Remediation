@@ -1,0 +1,12 @@
+apiVersion: tower.ansible.com/v1alpha1
+kind: AnsibleInventory
+metadata:
+  name: ims-remediation
+  namespace: aap
+  annotations:
+    argocd.argoproj.io/sync-wave: "33"
+spec:
+  connection_secret: aap-controller-connection
+  name: IMS Remediation Inventory
+  description: "Local execution inventory for IMS Remediation Lightspeed jobs"
+  organization: Default

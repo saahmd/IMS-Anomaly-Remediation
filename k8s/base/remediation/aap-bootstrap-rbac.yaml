@@ -14,15 +14,21 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "31"
 rules:
+  # Read the operator-created admin password secrets
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames:
       - aap-controller-admin-password
       - aap-eda-admin-password
     verbs: ["get"]
+  # Create/update the connection secret used by tower.ansible.com CRDs
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "patch", "update"]
+  # Discover AAP services by label
   - apiGroups: [""]
     resources: ["services"]
-    verbs: ["get", "list"]
+    verbs: ["list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
