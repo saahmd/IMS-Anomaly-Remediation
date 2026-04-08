@@ -12,7 +12,7 @@ data:
       hosts: localhost
       gather_facts: false
       vars:
-        controller_host:           "{{ lookup('env', 'CONTROLLER_HOST')     | default('https://aap-controller-service.aap.svc.cluster.local', true) }}"
+        controller_host:           "{{ lookup('env', 'CONTROLLER_HOST') }}"
         controller_username:       "{{ lookup('env', 'CONTROLLER_USERNAME') | default('admin', true) }}"
         controller_password:       "{{ lookup('env', 'CONTROLLER_PASSWORD') }}"
         controller_validate_certs: false
@@ -98,7 +98,7 @@ data:
       hosts: localhost
       gather_facts: false
       vars:
-        eda_host:           "{{ lookup('env', 'EDA_HOST')     | default('https://aap-eda-api-svc.aap.svc.cluster.local', true) }}"
+        eda_host:           "{{ lookup('env', 'EDA_HOST') }}"
         eda_username:       "{{ lookup('env', 'EDA_USERNAME') | default('admin', true) }}"
         eda_password:       "{{ lookup('env', 'EDA_PASSWORD') }}"
         eda_validate_certs: false

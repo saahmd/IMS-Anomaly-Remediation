@@ -12,12 +12,8 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      # aap-controller SA already has RBAC to read aap-controller-admin-password
-      # and aap-eda-admin-password secrets — same as the original control-plane approach.
       serviceAccountName: aap-controller
       initContainers:
-        # Read AAP controller password from the operator-created secret and
-        # write it to a shared volume so the main container env var is populated.
         - name: read-secrets
           image: registry.redhat.io/openshift4/ose-cli:latest
           command:
@@ -25,31 +21,51 @@ spec:
             - -c
             - |
               set -euo pipefail
-              echo -n "$(oc get secret aap-controller-admin-password -n aap -o jsonpath='{.data.password}' | base64 -d)" > /secrets/controller-password
-              echo -n "$(oc get secret aap-eda-admin-password        -n aap -o jsonpath='{.data.password}' | base64 -d)" > /secrets/eda-password
+
+              # Passwords — created automatically by the AAP operator
+              oc get secret aap-controller-admin-password -n aap \
+                -o jsonpath='{.data.password}' | base64 -d > /secrets/controller-password
+
+              oc get secret aap-eda-admin-password -n aap \
+                -o jsonpath='{.data.password}' | base64 -d > /secrets/eda-password
+
+              # Routes — guaranteed reachable from inside the cluster
+              oc get route aap-controller -n aap \
+                -o jsonpath='https://{.spec.host}' > /secrets/controller-url
+
+              oc get route aap-eda -n aap \
+                -o jsonpath='https://{.spec.host}' > /secrets/eda-url
+
+              echo "Secrets and URLs written:"
+              echo "  controller-url : $(cat /secrets/controller-url)"
+              echo "  eda-url        : $(cat /secrets/eda-url)"
           volumeMounts:
             - name: secrets
               mountPath: /secrets
+
       containers:
         - name: configure
-          # AAP 2.6 supported EE — includes ansible.controller and ansible.eda collections
+          # AAP 2.6 EE — ships ansible.controller and ansible.eda collections
           image: registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest
           command:
-            - ansible-playbook
-            - /playbook/configure-aap-resources.yml
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              # Read values written by the initContainer into env vars
+              export CONTROLLER_HOST=$(cat /secrets/controller-url)
+              export CONTROLLER_PASSWORD=$(cat /secrets/controller-password)
+              export EDA_HOST=$(cat /secrets/eda-url)
+              export EDA_PASSWORD=$(cat /secrets/eda-password)
+
+              echo "Running configure playbook against: $CONTROLLER_HOST"
+              ansible-playbook /playbook/configure-aap-resources.yml
           env:
-            - name: CONTROLLER_HOST
-              value: "https://aap-controller-service.aap.svc.cluster.local"
             - name: CONTROLLER_USERNAME
               value: "admin"
-            - name: CONTROLLER_PASSWORD
-              value: "$(cat /secrets/controller-password)"
-            - name: EDA_HOST
-              value: "https://aap-eda-api-svc.aap.svc.cluster.local"
             - name: EDA_USERNAME
               value: "admin"
-            - name: EDA_PASSWORD
-              value: "$(cat /secrets/eda-password)"
             - name: AAP_ORGANIZATION
               value: "Default"
             - name: AAP_PROJECT_NAME
@@ -67,6 +83,7 @@ spec:
               mountPath: /playbook
             - name: secrets
               mountPath: /secrets
+
       volumes:
         - name: playbook
           configMap:
