@@ -1,0 +1,22 @@
+---
+- name: IMS Remediation - Kafka-triggered Ansible Lightspeed playbook generation
+  hosts: localhost
+  sources:
+    - ansible.eda.kafka:
+        host: ims-release-kafka-kafka-bootstrap.ims-demo-lab.svc.cluster.local
+        port: 9092
+        topic: ims-remediation-events
+        group_id: eda-remediation-group
+        encoding: json
+  rules:
+    - name: Trigger Lightspeed template when a remediation prompt arrives
+      condition: event.payload.lightspeed_prompt is defined
+      action:
+        run_job_template:
+          name: "{{ controller_job_template_name }}"
+          organization: "{{ controller_organization_name }}"
+          job_args:
+            extra_vars:
+              lightspeed_prompt: "{{ event.payload.lightspeed_prompt }}"
+              lightspeed_wca_token: "{{ lightspeed_wca_token }}"
+              input_lightspeed_url: "{{ input_lightspeed_url | default('https://c.ai.ansible.redhat.com/api/v0/ai/generations/') }}"

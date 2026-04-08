@@ -1,0 +1,14 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: ims-remediation-events
+  namespace: ims-demo-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "31"
+  labels:
+    strimzi.io/cluster: ims-release-kafka
+spec:
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000

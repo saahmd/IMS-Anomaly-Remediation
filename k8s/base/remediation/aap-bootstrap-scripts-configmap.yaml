@@ -1,0 +1,267 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ims-remediation-bootstrap-scripts
+  namespace: aap
+  annotations:
+    argocd.argoproj.io/sync-wave: "32"
+data:
+  aap.py: |
+    from __future__ import annotations
+
+    import base64
+    import os
+    import time
+    from pathlib import Path
+    from typing import Any, Dict
+
+    import requests
+
+
+    class AAPBootstrapError(RuntimeError):
+        pass
+
+
+    TEMPLATE_DEFINITIONS: Dict[str, Dict[str, str]] = {
+        "ims_remediation": {
+            "job_template_name": "IMS Remediation - Lightspeed Playbook Generator",
+            "playbook": "automation/ansible/playbooks/ims-remediation.yaml",
+            "description": (
+                "Calls the Ansible Lightspeed API with a given lightspeed_prompt "
+                "and returns a generated playbook. Triggered via Kafka EDA events."
+            ),
+        },
+    }
+
+    TERMINAL_JOB_STATUSES = {"successful", "failed", "error", "canceled"}
+
+
+    def bootstrap_resources() -> Dict[str, Any]:
+        organization_id = _require_object_id("/api/v2/organizations/", _organization_name(), "organization")
+        inventory_id    = _ensure_inventory(organization_id)
+        project_id      = _ensure_project(organization_id)
+        _sync_project(project_id)
+        templates = []
+        for key, definition in TEMPLATE_DEFINITIONS.items():
+            template_id = _ensure_job_template(
+                organization_id=organization_id,
+                inventory_id=inventory_id,
+                project_id=project_id,
+                key=key,
+                playbook=definition["playbook"],
+                description=definition["description"],
+            )
+            templates.append({
+                "key": key,
+                "name": _job_template_name(key),
+                "job_template_id": template_id,
+                "playbook": definition["playbook"],
+            })
+        return {
+            "configured": True,
+            "organization": _organization_name(),
+            "inventory_name": _inventory_name(),
+            "inventory_id": inventory_id,
+            "project_name": _project_name(),
+            "project_id": project_id,
+            "templates": templates,
+        }
+
+
+    def controller_status() -> Dict[str, Any]:
+        try:
+            ping             = _request("GET", "/api/v2/ping/")
+            project_payload  = _request("GET", "/api/v2/projects/",      params={"name": _project_name(),    "page_size": 200})
+            template_payload = _request("GET", "/api/v2/job_templates/", params={"page_size": 200})
+            project_exists   = any(str(i.get("name") or "") == _project_name() for i in project_payload.get("results", []))
+            existing         = {str(i.get("name") or ""): int(i.get("id") or 0) for i in template_payload.get("results", [])}
+            templates = [
+                {
+                    "key": key,
+                    "name": _job_template_name(key),
+                    "template_exists": bool(existing.get(_job_template_name(key))),
+                    "job_template_id": existing.get(_job_template_name(key)),
+                }
+                for key in TEMPLATE_DEFINITIONS
+            ]
+            return {
+                "configured": True,
+                "live_configured": True,
+                "version": ping.get("version"),
+                "project_exists": project_exists,
+                "bootstrapped": project_exists and all(t["template_exists"] for t in templates),
+                "templates": templates,
+            }
+        except Exception as exc:  # noqa: BLE001
+            return {"configured": True, "live_configured": False, "error": str(exc)}
+
+
+    def _controller_url() -> str:
+        return (os.getenv("AAP_CONTROLLER_URL", "").strip() or "http://aap-controller-service.aap.svc.cluster.local").rstrip("/")
+
+    def _controller_username() -> str:
+        return os.getenv("AAP_CONTROLLER_USERNAME", "admin").strip() or "admin"
+
+    def _controller_password() -> str:
+        explicit = os.getenv("AAP_CONTROLLER_PASSWORD", "").strip()
+        if explicit:
+            return explicit
+        ns   = os.getenv("AAP_CONTROLLER_PASSWORD_SECRET_NAMESPACE", "aap").strip() or "aap"
+        name = os.getenv("AAP_CONTROLLER_PASSWORD_SECRET_NAME", "aap-controller-admin-password").strip() or "aap-controller-admin-password"
+        key  = os.getenv("AAP_CONTROLLER_PASSWORD_SECRET_KEY", "password").strip() or "password"
+        return _read_kubernetes_secret_key(ns, name, key)
+
+    def _controller_verify() -> bool:
+        val = os.getenv("AAP_CONTROLLER_VERIFY_SSL", "").strip().lower()
+        return False if val in {"false", "0", "no"} else True
+
+    def _organization_name() -> str:
+        return os.getenv("AAP_ORGANIZATION", "Default").strip() or "Default"
+
+    def _inventory_name() -> str:
+        return os.getenv("AAP_INVENTORY_NAME", "IMS Remediation Inventory").strip() or "IMS Remediation Inventory"
+
+    def _project_name() -> str:
+        return os.getenv("AAP_PROJECT_NAME", "IMS Remediation").strip() or "IMS Remediation"
+
+    def _project_scm_url() -> str:
+        return os.getenv("AAP_PROJECT_SCM_URL", "").strip() or "https://github.com/<your-org>/ims-remediation.git"
+
+    def _project_branch() -> str:
+        return os.getenv("AAP_PROJECT_BRANCH", "main").strip() or "main"
+
+    def _job_template_name(key: str) -> str:
+        definition = TEMPLATE_DEFINITIONS.get(key) or {}
+        return os.getenv(f"AAP_JOB_TEMPLATE_{key.upper()}", definition.get("job_template_name", key)).strip() or key
+
+    def _ensure_inventory(organization_id: int) -> int:
+        name    = _inventory_name()
+        payload = _request("GET", "/api/v2/inventories/", params={"name": name, "page_size": 200})
+        inv     = next((i for i in payload.get("results", []) if str(i.get("name") or "") == name), None)
+        if inv is None:
+            inv = _request("POST", "/api/v2/inventories/", expected_status=(200, 201),
+                           json={"name": name, "organization": organization_id,
+                                 "description": "Local execution inventory for IMS Remediation jobs."})
+        _ensure_inventory_host(int(inv["id"]))
+        return int(inv["id"])
+
+    def _ensure_inventory_host(inventory_id: int) -> None:
+        payload = _request("GET", f"/api/v2/inventories/{inventory_id}/hosts/", params={"name": "localhost", "page_size": 200})
+        if any(str(i.get("name") or "") == "localhost" for i in payload.get("results", [])):
+            return
+        _request("POST", f"/api/v2/inventories/{inventory_id}/hosts/", expected_status=(200, 201),
+                 json={"name": "localhost", "variables": "ansible_connection: local\nansible_python_interpreter: /usr/bin/python3\n"})
+
+    def _ensure_project(organization_id: int) -> int:
+        name    = _project_name()
+        payload = _request("GET", "/api/v2/projects/", params={"name": name, "page_size": 200})
+        project = next((i for i in payload.get("results", []) if str(i.get("name") or "") == name), None)
+        desired: Dict[str, Any] = {
+            "name": name, "organization": organization_id,
+            "description": "IMS Remediation automation sourced from the ims-remediation GitHub repository.",
+            "scm_type": "git", "scm_url": _project_scm_url(), "scm_branch": _project_branch(),
+            "scm_update_on_launch": True, "allow_override": False,
+        }
+        if project is None:
+            return int(_request("POST", "/api/v2/projects/", expected_status=(200, 201), json=desired)["id"])
+        patch = {f: desired[f] for f in ("scm_url", "scm_branch", "scm_update_on_launch", "description") if project.get(f) != desired[f]}
+        if patch:
+            _request("PATCH", f"/api/v2/projects/{project['id']}/", json=patch)
+        return int(project["id"])
+
+    def _sync_project(project_id: int) -> None:
+        payload   = _request("POST", f"/api/v2/projects/{project_id}/update/", expected_status=(200, 202), json={})
+        update_id = int(payload.get("project_update") or payload.get("id") or 0)
+        if not update_id:
+            return
+        deadline = time.time() + float(os.getenv("AAP_PROJECT_SYNC_TIMEOUT_SECONDS", "120"))
+        while time.time() < deadline:
+            update = _request("GET", f"/api/v2/project_updates/{update_id}/")
+            status = str(update.get("status") or "").lower()
+            if status == "successful":
+                return
+            if status in {"failed", "error", "canceled"}:
+                raise AAPBootstrapError(f"Project sync failed: {update.get('result_traceback') or status}")
+            time.sleep(4)
+        raise AAPBootstrapError(f"Project sync timed out for '{_project_name()}'.")
+
+    def _ensure_job_template(organization_id: int, inventory_id: int, project_id: int,
+                              key: str, playbook: str, description: str) -> int:
+        name     = _job_template_name(key)
+        payload  = _request("GET", "/api/v2/job_templates/", params={"name": name, "page_size": 200})
+        template = next((i for i in payload.get("results", []) if str(i.get("name") or "") == name), None)
+        desired: Dict[str, Any] = {
+            "name": name, "description": description, "job_type": "run",
+            "inventory": inventory_id, "project": project_id, "organization": organization_id,
+            "playbook": playbook, "ask_variables_on_launch": True, "verbosity": 1,
+            "extra_vars": "input_lightspeed_url: https://c.ai.ansible.redhat.com/api/v0/ai/generations/\nlightspeed_wca_token: \"\"\nlightspeed_prompt: \"\"\n",
+        }
+        if template is None:
+            return int(_request("POST", "/api/v2/job_templates/", expected_status=(200, 201), json=desired)["id"])
+        patch = {f: desired[f] for f in desired if template.get(f) != desired[f]}
+        if patch:
+            _request("PATCH", f"/api/v2/job_templates/{template['id']}/", json=patch)
+        return int(template["id"])
+
+    def _require_object_id(path: str, name: str, label: str) -> int:
+        payload = _request("GET", path, params={"name": name, "page_size": 200})
+        for item in payload.get("results", []):
+            if str(item.get("name") or "") == name:
+                return int(item["id"])
+        raise AAPBootstrapError(f"AAP {label} '{name}' not found.")
+
+    def _request(method: str, path: str, expected_status: tuple = (200,), **kwargs: Any) -> Dict[str, Any]:
+        url      = f"{_controller_url()}{path}"
+        response = requests.request(
+            method, url,
+            auth=(_controller_username(), _controller_password()),
+            verify=_controller_verify(),
+            timeout=float(os.getenv("AAP_CONTROLLER_TIMEOUT_SECONDS", "30")),
+            headers={"Content-Type": "application/json", **kwargs.pop("headers", {})},
+            **kwargs,
+        )
+        if response.status_code not in expected_status:
+            raise AAPBootstrapError(f"AAP {method} {path}: {response.status_code} {response.text[:400]}")
+        return response.json() if response.text.strip() else {}
+
+    def _read_kubernetes_secret_key(namespace: str, name: str, key: str) -> str:
+        token    = Path("/var/run/secrets/kubernetes.io/serviceaccount/token").read_text(encoding="utf-8").strip()
+        ca_path  = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        host     = os.getenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+        port     = os.getenv("KUBERNETES_SERVICE_PORT_HTTPS", "443")
+        response = requests.get(f"https://{host}:{port}/api/v1/namespaces/{namespace}/secrets/{name}",
+                                headers={"Authorization": f"Bearer {token}"}, verify=ca_path, timeout=15)
+        if response.status_code != 200:
+            raise AAPBootstrapError(f"Cannot read secret {namespace}/{name}: {response.status_code}")
+        encoded = (response.json().get("data") or {}).get(key, "")
+        if not encoded:
+            raise AAPBootstrapError(f"Secret {namespace}/{name} has no key '{key}'.")
+        return base64.b64decode(encoded).decode("utf-8").strip()
+
+  main.py: |
+    from __future__ import annotations
+    import json
+    import sys
+    import aap
+
+    def main() -> None:
+        print("=== IMS Remediation AAP Bootstrap ===")
+        print("\n[1/2] Checking AAP Controller status...")
+        status = aap.controller_status()
+        print(json.dumps(status, indent=2))
+        if status.get("bootstrapped"):
+            print("\n[✓] AAP resources already configured — nothing to do.")
+            return
+        print("\n[2/2] Bootstrapping AAP resources...")
+        result = aap.bootstrap_resources()
+        print(json.dumps(result, indent=2))
+        print("\n[✓] Bootstrap complete.")
+        for t in result.get("templates", []):
+            print(f"    • {t['name']}  (id={t['job_template_id']}, playbook={t['playbook']})")
+
+    if __name__ == "__main__":
+        try:
+            main()
+        except aap.AAPBootstrapError as exc:
+            print(f"\n[✗] Bootstrap failed: {exc}", file=sys.stderr)
+            sys.exit(1)

@@ -1,0 +1,37 @@
+---
+- name: Interact with Ansible Lightspeed API and Generate Ansible Playbook
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Send request to AI API
+      ansible.builtin.uri:
+        url: "{{ input_lightspeed_url | default('https://c.ai.ansible.redhat.com/api/v0/ai/generations/') }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Bearer {{ lightspeed_wca_token }}"
+        body_format: json
+        body:
+          text: "{{ lightspeed_prompt }}"
+      register: response
+
+    - name: Display API response
+      ansible.builtin.debug:
+        msg: "{{ response.json }}"
+
+    - name: Preserve raw YAML playbook (string)
+      ansible.builtin.set_fact:
+        lightspeed_playbook_raw: "{{ response.json.playbook }}"
+
+    - name: Set stat on raw playbook YAML
+      ansible.builtin.set_stats:
+        data:
+          lightspeed_playbook: "{{ lightspeed_playbook_raw }}"
+
+    - name: Display Ansible Playbook in JSON
+      ansible.builtin.debug:
+        msg: "{{ lightspeed_playbook_raw }}"
+
+    - name: Display Ansible Playbook in YAML
+      ansible.builtin.debug:
+        msg: "{{ lightspeed_playbook_raw | to_nice_yaml(sort_keys=False) }}"
