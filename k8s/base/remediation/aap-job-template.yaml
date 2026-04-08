@@ -14,7 +14,7 @@ spec:
   job_type: run
   organization: Default
   project: IMS Remediation
-  inventory: IMS Remediation Inventory
+  inventory: Demo Inventory
   playbook: automation/ansible/playbooks/ims-remediation.yaml
   ask_variables_on_launch: true
   extra_vars: |
