@@ -12,40 +12,9 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      serviceAccountName: aap-controller
-      initContainers:
-        - name: read-secrets
-          image: registry.redhat.io/openshift4/ose-cli:latest
-          command:
-            - /bin/bash
-            - -c
-            - |
-              set -euo pipefail
-
-              # Passwords — created automatically by the AAP operator
-              oc get secret aap-controller-admin-password -n aap \
-                -o jsonpath='{.data.password}' | base64 -d > /secrets/controller-password
-
-              oc get secret aap-eda-admin-password -n aap \
-                -o jsonpath='{.data.password}' | base64 -d > /secrets/eda-password
-
-              # Routes — guaranteed reachable from inside the cluster
-              oc get route aap-controller -n aap \
-                -o jsonpath='https://{.spec.host}' > /secrets/controller-url
-
-              oc get route aap-eda -n aap \
-                -o jsonpath='https://{.spec.host}' > /secrets/eda-url
-
-              echo "Secrets and URLs written:"
-              echo "  controller-url : $(cat /secrets/controller-url)"
-              echo "  eda-url        : $(cat /secrets/eda-url)"
-          volumeMounts:
-            - name: secrets
-              mountPath: /secrets
-
+      serviceAccountName: ims-remediation-bootstrap
       containers:
         - name: configure
-          # AAP 2.6 EE — ships ansible.controller and ansible.eda collections
           image: registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest
           command:
             - /bin/bash
@@ -53,14 +22,75 @@ spec:
             - |
               set -euo pipefail
 
-              # Read values written by the initContainer into env vars
-              export CONTROLLER_HOST=$(cat /secrets/controller-url)
-              export CONTROLLER_PASSWORD=$(cat /secrets/controller-password)
-              export EDA_HOST=$(cat /secrets/eda-url)
-              export EDA_PASSWORD=$(cat /secrets/eda-password)
+              # ── Kubernetes API helpers ──────────────────────────────────────
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              API="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}"
 
-              echo "Running configure playbook against: $CONTROLLER_HOST"
+              k8s_get() {
+                curl -sf --cacert "$CA" \
+                  -H "Authorization: Bearer $TOKEN" \
+                  -H "Accept: application/json" \
+                  "${API}${1}"
+              }
+
+              # ── Read AAP passwords from operator-created secrets ────────────
+              echo "[1/3] Reading AAP passwords from Kubernetes secrets..."
+
+              export CONTROLLER_PASSWORD
+              CONTROLLER_PASSWORD=$(k8s_get "/api/v1/namespaces/aap/secrets/aap-controller-admin-password" \
+                | python3 -c "import sys,json,base64; \
+                    d=json.load(sys.stdin)['data']['password']; \
+                    print(base64.b64decode(d).decode().strip())")
+
+              export EDA_PASSWORD
+              EDA_PASSWORD=$(k8s_get "/api/v1/namespaces/aap/secrets/aap-eda-admin-password" \
+                | python3 -c "import sys,json,base64; \
+                    d=json.load(sys.stdin)['data']['password']; \
+                    print(base64.b64decode(d).decode().strip())")
+
+              # ── Discover Controller and EDA services ────────────────────────
+              echo "[2/3] Discovering AAP service URLs..."
+
+              # List all services in the aap namespace and find by label
+              SERVICES=$(k8s_get "/api/v1/namespaces/aap/services")
+
+              # Controller service: label app.kubernetes.io/component=automationcontroller
+              CONTROLLER_SVC=$(echo "$SERVICES" | python3 -c "
+              import sys, json
+              items = json.load(sys.stdin)['items']
+              for svc in items:
+                  labels = svc.get('metadata', {}).get('labels', {})
+                  name   = svc['metadata']['name']
+                  if labels.get('app.kubernetes.io/component') == 'automationcontroller' \
+                  or 'controller' in name:
+                      print(name)
+                      break
+              ")
+
+              # EDA service: label app.kubernetes.io/component=eda
+              EDA_SVC=$(echo "$SERVICES" | python3 -c "
+              import sys, json
+              items = json.load(sys.stdin)['items']
+              for svc in items:
+                  labels = svc.get('metadata', {}).get('labels', {})
+                  name   = svc['metadata']['name']
+                  if labels.get('app.kubernetes.io/component') == 'eda' \
+                  or ('eda' in name and 'api' in name):
+                      print(name)
+                      break
+              ")
+
+              export CONTROLLER_HOST="https://${CONTROLLER_SVC}.aap.svc.cluster.local"
+              export EDA_HOST="https://${EDA_SVC}.aap.svc.cluster.local"
+
+              echo "  Controller : ${CONTROLLER_HOST}"
+              echo "  EDA        : ${EDA_HOST}"
+
+              # ── Run the configuration playbook ──────────────────────────────
+              echo "[3/3] Running AAP configuration playbook..."
               ansible-playbook /playbook/configure-aap-resources.yml
+
           env:
             - name: CONTROLLER_USERNAME
               value: "admin"
@@ -81,13 +111,7 @@ spec:
           volumeMounts:
             - name: playbook
               mountPath: /playbook
-            - name: secrets
-              mountPath: /secrets
-
       volumes:
         - name: playbook
           configMap:
             name: ims-remediation-configure-playbook
-        - name: secrets
-          emptyDir:
-            medium: Memory
