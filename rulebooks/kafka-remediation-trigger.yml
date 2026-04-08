@@ -5,7 +5,7 @@
     - ansible.eda.kafka:
         host: ims-release-kafka-kafka-bootstrap.ims-demo-lab.svc.cluster.local
         port: 9092
-        topic: ims-remediation-events
+        topic: aiops-ansible-playbook-generate-instruction
         group_id: eda-remediation-group
         encoding: json
   rules:

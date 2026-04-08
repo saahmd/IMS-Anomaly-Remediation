@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ims-remediation-configure
+  namespace: aap
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "33"
+spec:
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      # aap-controller SA already has RBAC to read aap-controller-admin-password
+      # and aap-eda-admin-password secrets — same as the original control-plane approach.
+      serviceAccountName: aap-controller
+      initContainers:
+        # Read AAP controller password from the operator-created secret and
+        # write it to a shared volume so the main container env var is populated.
+        - name: read-secrets
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo -n "$(oc get secret aap-controller-admin-password -n aap -o jsonpath='{.data.password}' | base64 -d)" > /secrets/controller-password
+              echo -n "$(oc get secret aap-eda-admin-password        -n aap -o jsonpath='{.data.password}' | base64 -d)" > /secrets/eda-password
+          volumeMounts:
+            - name: secrets
+              mountPath: /secrets
+      containers:
+        - name: configure
+          # AAP 2.6 supported EE — includes ansible.controller and ansible.eda collections
+          image: registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest
+          command:
+            - ansible-playbook
+            - /playbook/configure-aap-resources.yml
+          env:
+            - name: CONTROLLER_HOST
+              value: "https://aap-controller-service.aap.svc.cluster.local"
+            - name: CONTROLLER_USERNAME
+              value: "admin"
+            - name: CONTROLLER_PASSWORD
+              value: "$(cat /secrets/controller-password)"
+            - name: EDA_HOST
+              value: "https://aap-eda-api-svc.aap.svc.cluster.local"
+            - name: EDA_USERNAME
+              value: "admin"
+            - name: EDA_PASSWORD
+              value: "$(cat /secrets/eda-password)"
+            - name: AAP_ORGANIZATION
+              value: "Default"
+            - name: AAP_PROJECT_NAME
+              value: "IMS Remediation"
+            - name: AAP_INVENTORY_NAME
+              value: "IMS Remediation Inventory"
+            - name: AAP_JOB_TEMPLATE_NAME
+              value: "IMS Remediation - Lightspeed Playbook Generator"
+            - name: AAP_PROJECT_SCM_URL
+              value: "https://github.com/saahmd/IMS-Anomaly-Remediation.git"
+            - name: AAP_PROJECT_BRANCH
+              value: "main"
+          volumeMounts:
+            - name: playbook
+              mountPath: /playbook
+            - name: secrets
+              mountPath: /secrets
+      volumes:
+        - name: playbook
+          configMap:
+            name: ims-remediation-configure-playbook
+        - name: secrets
+          emptyDir:
+            medium: Memory
