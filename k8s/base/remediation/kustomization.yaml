@@ -7,3 +7,5 @@ resources:
   - aap-project.yaml                  # wave 33 — AnsibleProject CRD
   - aap-inventory.yaml                # wave 33 — AnsibleInventory CRD
   - aap-job-template.yaml             # wave 34 — JobTemplate CRD
+  - eda-kafka-bootstrap-configmap.yaml  # wave 34 — ConfigMap: eda_kafka.py script
+  - eda-kafka-bootstrap-job.yaml        # wave 35 — Job: bootstraps EDA Kafka project + activations

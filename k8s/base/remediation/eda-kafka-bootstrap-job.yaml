@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: eda-kafka-bootstrap
+  namespace: aap
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 4
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: ims-remediation-bootstrap
+      volumes:
+        - name: script
+          configMap:
+            name: eda-kafka-bootstrap-script
+      containers:
+        - name: eda-kafka-bootstrap
+          image: registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo "[1/2] Installing dependencies..."
+              pip install --quiet requests
+              echo "[2/2] Running EDA Kafka bootstrap..."
+              python /scripts/eda_kafka.py
+          env:
+            - name: EDA_API_URL
+              value: "http://aap-eda-api.aap.svc.cluster.local:8000"
+            - name: EDA_VERIFY_SSL
+              value: "false"
+            - name: EDA_ORGANIZATION
+              value: "Default"
+            - name: EDA_KAFKA_PROJECT_NAME
+              value: "IMS Kafka Event Policies"
+            - name: EDA_PROJECT_URL
+              value: "http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/ims-remediation.git"
+            - name: EDA_PROJECT_BRANCH
+              value: "main"
+            - name: EDA_KAFKA_DECISION_ENVIRONMENT_NAME
+              value: "IMS Kafka Decisions"
+            - name: EDA_DECISION_ENVIRONMENT_IMAGE
+              value: "registry.redhat.io/ansible-automation-platform-26/de-minimal-rhel9:latest"
+            - name: AAP_CONTROLLER_URL
+              value: "http://aap-controller-service.aap.svc.cluster.local"
+            - name: AAP_CONTROLLER_USERNAME
+              value: "admin"
+            - name: EDA_KAFKA_ENABLED
+              value: "true"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
