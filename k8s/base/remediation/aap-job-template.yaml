@@ -17,4 +17,4 @@ spec:
   inventory: IMS Remediation Inventory
   playbook: automation/ansible/playbooks/ims-remediation.yaml
   ask_variables_on_launch: true
-  extra_vars: '{"input_lightspeed_url": "http://aap-lightspeed-api.aap.svc.cluster.local/api/v1/ai/chat/", "lightspeed_token": "", "lightspeed_prompt": ""}'
+  extra_vars: '{"input_lightspeed_url": "http://aap-lightspeed-api.aap.svc.cluster.local:8000/api/v1/ai/chat/", "lightspeed_token": "redhat", "lightspeed_prompt": ""}'
