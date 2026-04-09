@@ -5,14 +5,17 @@
   tasks:
     - name: Send request to AI API
       ansible.builtin.uri:
-        url: "{{ input_lightspeed_url | default('http://aap-lightspeed-api.aap.svc.cluster.local/api/v1/ai/chat/') }}"
+        url: "{{ input_lightspeed_url | default('https://aap-lightspeed-aap.apps.ocp.4rb7v.sandbox2461.opentlc.com/api/v1/ai/chat/') }}"
         method: POST
         headers:
           Content-Type: "application/json"
-          Authorization: "Bearer {{ lightspeed_wca_token }}"
+          Authorization: "Bearer {{ lightspeed_wca_token | default('admin') }}"
         body_format: json
         body:
-          text: "{{ lightspeed_prompt }}"
+          no_tools: true
+          query: "{{ lightspeed_query | default('') }}"
+          model: "{{ lightspeed_model | default('qwen3-14b') }}"
+          system_prompt: "{{ lightspeed_system_prompt | default('You are an Ansible Code generator assistant') }}"
       register: response
 
     - name: Display API response
