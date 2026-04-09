@@ -5,7 +5,7 @@
   tasks:
     - name: Send request to AI API
       ansible.builtin.uri:
-        url: "{{ input_lightspeed_url | default('https://c.ai.ansible.redhat.com/api/v0/ai/generations/') }}"
+        url: "{{ input_lightspeed_url | default('http://aap-lightspeed-api.aap.svc.cluster.local/api/v1/ai/chat/') }}"
         method: POST
         headers:
           Content-Type: "application/json"
