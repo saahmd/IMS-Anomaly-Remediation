@@ -21,11 +21,11 @@
 
     - name: Send request to AI API
       ansible.builtin.uri:
-        url: "{{ input_lightspeed_url | default('https://aap-lightspeed-aap.apps.ocp.4rb7v.sandbox2461.opentlc.com/api/v1/ai/chat/') }}"
+        url: "{{ input_lightspeed_url | default('aap-lightspeed-api.aap.svc.cluster.local/api/v1/ai/chat/') }}"
         method: POST
         headers:
           Content-Type: "application/json"
-          Authorization: "Bearer {{ lightspeed_wca_token | default('admin') }}"
+          Authorization: "Bearer {{ lightspeed_token | default('redhat') }}"
         body: "{{ request_body }}"
         timeout: 300
         status_code: 200
