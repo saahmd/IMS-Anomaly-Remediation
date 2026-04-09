@@ -10,7 +10,7 @@ spec:
   name: IMS Remediation
   description: "IMS Remediation automation — Ansible Lightspeed playbook generator"
   scm_type: git
-  scm_url: "https://github.com/saahmd/IMS-Anomaly-Remediation.git"
+  repo: 'https://github.com/saahmd/IMS-Anomaly-Remediation.git'
   scm_branch: main
   organization: Default
   update_on_launch: true
