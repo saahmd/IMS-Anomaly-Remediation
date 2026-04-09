@@ -9,7 +9,7 @@
           {{
             {
               'no_tools': true,
-              'query': lightspeed_query | default(''),
+              'query': lightspeed_prompt | default(''),
               'model': lightspeed_model | default('qwen3-14b'),
               'system_prompt': lightspeed_system_prompt | default('You are an Ansible Code generator assistant')
             } | to_json
@@ -21,7 +21,7 @@
 
     - name: Send request to AI API
       ansible.builtin.uri:
-        url: "{{ input_lightspeed_url | default('aap-lightspeed-api.aap.svc.cluster.local/api/v1/ai/chat/') }}"
+        url: "{{ input_lightspeed_url | default('http://aap-lightspeed-api.aap.svc.cluster.local/api/v1/ai/chat/') }}"
         method: POST
         headers:
           Content-Type: "application/json"
