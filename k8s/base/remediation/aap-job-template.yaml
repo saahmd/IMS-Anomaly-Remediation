@@ -17,7 +17,4 @@ spec:
   inventory: IMS Remediation Inventory
   playbook: automation/ansible/playbooks/ims-remediation.yaml
   ask_variables_on_launch: true
-  extra_vars: |
-    input_lightspeed_url: https://c.ai.ansible.redhat.com/api/v0/ai/generations/
-    lightspeed_wca_token: ""
-    lightspeed_prompt: ""
+  extra_vars: '{"input_lightspeed_url": "https://c.ai.ansible.redhat.com/api/v0/ai/generations/", "lightspeed_wca_token": "", "lightspeed_prompt": ""}'
