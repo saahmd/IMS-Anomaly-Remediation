@@ -1,22 +1,20 @@
 ---
-- name: Web app issue
-  hosts: all
+- name: IMS Remediation - Kafka-triggered Ansible Lightspeed playbook generation
+  hosts: localhost
   sources:
     - ansible.eda.kafka:
-        host: service1
+        host: ims-release-kafka-kafka-bootstrap.ims-demo-lab.svc.cluster.local
         port: 9092
-        topic: httpd-error-logs
-
+        topic: aiops-ansible-playbook-generate-instruction
   rules:
-    - name: apache shutdown detected
-      condition: event.body.message is search("shutting down")
+    - name: Trigger Lightspeed template when a remediation prompt arrives
+      condition: event.payload.lightspeed_prompt is defined
       action:
-        run_workflow_template:
-          organization: "Default"
-          name: "{{ workflow_template_name | default('AI Insights and Lightspeed prompt generation') }}"
-
-    - name: show event messages
-      condition: event.body.message is defined
-      action:
-        debug:
-          msg: "{{ event.body.message }}"
+        run_job_template:
+          name: "{{ controller_job_template_name }}"
+          organization: "{{ controller_organization_name }}"
+          job_args:
+            extra_vars:
+              lightspeed_prompt: "{{ event.payload.lightspeed_prompt }}"
+              lightspeed_wca_token: "{{ lightspeed_wca_token }}"
+              input_lightspeed_url: "{{ input_lightspeed_url | default('https://c.ai.ansible.redhat.com/api/v0/ai/generations/') }}"
