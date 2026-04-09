@@ -25,9 +25,9 @@ spec:
             - |
               set -euo pipefail
               echo "[1/2] Installing dependencies..."
-              pip install --quiet requests
+              python3 -m pip install --quiet requests
               echo "[2/2] Running EDA Kafka bootstrap..."
-              python /scripts/eda_kafka.py
+              python3 /scripts/eda_kafka.py
           env:
             - name: EDA_API_URL
               value: "http://aap-eda-api.aap.svc.cluster.local:8000"
