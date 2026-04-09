@@ -38,7 +38,7 @@ spec:
             - name: EDA_KAFKA_PROJECT_NAME
               value: "IMS Kafka Event Policies"
             - name: EDA_PROJECT_URL
-              value: "http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/ims-remediation.git"
+              value: "https://github.com/saahmd/IMS-Anomaly-Remediation.git"
             - name: EDA_PROJECT_BRANCH
               value: "main"
             - name: EDA_KAFKA_DECISION_ENVIRONMENT_NAME

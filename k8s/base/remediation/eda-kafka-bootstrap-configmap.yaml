@@ -158,10 +158,10 @@ data:
     def _ensure_project(organization_id: int) -> int:
         desired = {
             "name": _project_name(),
-            "description": "Kafka event-driven policies sourced from the cluster Git repository.",
+            "description": "Kafka event-driven policies sourced from GitHub.",
             "organization_id": organization_id,
             "url": _project_url(),
-            "verify_ssl": False if _project_url().startswith("http://") else True,
+            "verify_ssl": True,
             "scm_type": "git",
             "scm_branch": _project_branch(),
         }
@@ -291,6 +291,10 @@ data:
         return int(created_awx_token["id"])
 
 
+    # ---------------------------------------------------------------------------
+    # Config helpers
+    # ---------------------------------------------------------------------------
+
     def _api_url() -> str:
         return (os.getenv("EDA_API_URL", "").strip() or "http://aap-eda-api.aap.svc.cluster.local:8000").rstrip("/")
 
@@ -364,6 +368,11 @@ data:
 
     def _controller_token_name() -> str:
         return os.getenv("EDA_KAFKA_CONTROLLER_TOKEN_NAME", "IMS EDA Kafka Controller Token").strip() or "IMS EDA Kafka Controller Token"
+
+
+    # ---------------------------------------------------------------------------
+    # HTTP helpers
+    # ---------------------------------------------------------------------------
 
     def _request(method, path, expected_status=(200,), **kwargs):
         response = requests.request(
