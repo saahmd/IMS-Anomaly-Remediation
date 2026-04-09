@@ -38,7 +38,7 @@
 
     - name: Preserve raw YAML playbook (string)
       ansible.builtin.set_fact:
-        lightspeed_playbook_raw: "{{ response.json.playbook }}"
+        lightspeed_playbook_raw: "{{ response.json }}"
 
     - name: Set stat on raw playbook YAML
       ansible.builtin.set_stats:
