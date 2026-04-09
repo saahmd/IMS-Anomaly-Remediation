@@ -16,6 +16,7 @@
           query: "{{ lightspeed_query | default('') }}"
           model: "{{ lightspeed_model | default('qwen3-14b') }}"
           system_prompt: "{{ lightspeed_system_prompt | default('You are an Ansible Code generator assistant') }}"
+      timeout: 300   # ← Add this — 5 minutes, adjust as needed
       register: response
 
     - name: Display API response
