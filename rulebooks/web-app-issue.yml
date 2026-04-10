@@ -7,10 +7,15 @@
         port: 9092
         topic: aiops-ansible-playbook-generate-instruction
   rules:
+    - name: Debug - print all Kafka events
+      condition: event.body is defined
+      action:
+        debug:
+          msg: "{{ event }}"
+          
     - name: Trigger playbook generation on anomaly incident
       condition: >
-        event.message is defined and
-        "Generate a reviewable Ansible playbook" in event.message
+        "Generate a reviewable Ansible playbook" in event.body
       action:
         run_job_template:
           name: "IMS - Parse and Dispatch Incident"
