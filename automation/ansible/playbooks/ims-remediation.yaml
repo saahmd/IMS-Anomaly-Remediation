@@ -96,3 +96,24 @@
           callback_url: "{{ callback_url }}"
           correlation_id: "{{ correlation_id }}"
           playbook_yaml_preview: "{{ extracted_playbook_yaml | truncate(200) }}"
+
+    - name: Debug all envelope fields before building payload
+      ansible.builtin.debug:
+        msg:
+          correlation_id: "{{ correlation_id }}"
+          callback_url: "{{ callback_url }}"
+          status: "{{ parsed_envelope.status | default('NOT FOUND') }}"
+          title: "{{ parsed_envelope.title | default('NOT FOUND') }}"
+          description: "{{ parsed_envelope.description | default('NOT FOUND') }}"
+          summary: "{{ parsed_envelope.summary | default('NOT FOUND') }}"
+          expected_outcome: "{{ parsed_envelope.expected_outcome | default('NOT FOUND') }}"
+          preconditions: "{{ parsed_envelope.preconditions | default('NOT FOUND') }}"
+          playbook_ref: "{{ parsed_envelope.playbook_ref | default('NOT FOUND') }}"
+          action_ref: "{{ parsed_envelope.action_ref | default('NOT FOUND') }}"
+          provider_name: "{{ parsed_envelope.provider_name | default('NOT FOUND') }}"
+          provider_run_id: "{{ parsed_envelope.provider_run_id | default('NOT FOUND') }}"
+          playbook_yaml_preview: "{{ extracted_playbook_yaml[:300] }}"
+
+    - name: Debug full parsed envelope (catch any unexpected keys)
+      ansible.builtin.debug:
+        var: parsed_envelope
