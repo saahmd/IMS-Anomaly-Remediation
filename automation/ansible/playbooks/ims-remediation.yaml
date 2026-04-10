@@ -54,7 +54,9 @@
         msg: "{{ lightspeed_playbook_raw | to_nice_yaml(sort_keys=False) }}"
 
 
-
+    - name: Extract raw response string
+      ansible.builtin.set_fact:
+        raw_response: "{{ response.json.response }}"
 
     - name: Strip markdown code fences
       ansible.builtin.set_fact:
