@@ -56,10 +56,6 @@
 
 
 
-    - name: Extract raw response string
-      ansible.builtin.set_fact:
-        raw_response: "{{ response.json.response }}"
-
     - name: Strip markdown code fences
       ansible.builtin.set_fact:
         clean_yaml_str: >-
@@ -70,9 +66,21 @@
             | trim
           }}
 
-    - name: Parse outer YAML envelope
+    - name: Split envelope from nested playbook_yaml
       ansible.builtin.set_fact:
-        parsed_envelope: "{{ clean_yaml_str | from_yaml }}"
+        # Split on '---' that starts a new line after the first one
+        # Part 0 is empty or first ---, part 1 is envelope fields, part 2+ is the playbook
+        yaml_parts: "{{ clean_yaml_str.split('\n---\n') }}"
+
+    - name: Extract envelope YAML string
+      ansible.builtin.set_fact:
+        # The envelope is parts[0] (may start with ---), playbook is parts[1] onward
+        envelope_str: "{{ yaml_parts[0] | regex_replace('^---\\n?', '') }}"
+        playbook_str: "---\n{{ yaml_parts[1:] | join('\n---\n') }}"
+
+    - name: Parse envelope
+      ansible.builtin.set_fact:
+        parsed_envelope: "{{ envelope_str | from_yaml }}"
 
     - name: Extract callback URL
       ansible.builtin.set_fact:
