@@ -14,7 +14,7 @@
           msg: "{{ event }}"
 
     - name: Trigger playbook generation on anomaly incident
-      condition: event.body.message is search("Generate a reviewable Ansible playbook")
+      condition: event.body is search("Generate a reviewable Ansible playbook", ignorecase=true)
       action:
         run_job_template:
           name: "IMS - Parse and Dispatch Incident"
