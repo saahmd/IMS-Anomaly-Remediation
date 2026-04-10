@@ -1,6 +1,7 @@
 ---
 - name: IMS Remediation - Kafka-triggered Ansible Lightspeed playbook generation
   hosts: localhost
+  match_multiple_rules: true
   sources:
     - ansible.eda.kafka:
         host: ims-release-kafka-kafka-bootstrap.ims-demo-lab.svc.cluster.local
