@@ -19,10 +19,9 @@
       action:
         run_job_template:
           name: "IMS Remediation - Lightspeed Playbook Generator"
-          organization: "IMS Org"
+          organization: "Default"
           job_args:
             extra_vars:
-              lightspeed_query: "{{ event.message }}"
-              lightspeed_token: "{{ lightspeed_token }}"
-              input_lightspeed_url: "{{ input_lightspeed_url | default('https://c.ai.ansible.redhat.com/api/v0/ai/generations/') }}"
+              lightspeed_prompt: "{{ event.message }}"
+              input_lightspeed_url: "{{ input_lightspeed_url | default('http://aap-lightspeed-api.aap.svc.cluster.local:8000/api/v1/ai/chat/') }}"
 
