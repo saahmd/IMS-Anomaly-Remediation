@@ -7,14 +7,17 @@
         port: 9092
         topic: aiops-ansible-playbook-generate-instruction
   rules:
-    - name: Trigger Lightspeed template when a remediation prompt arrives
-      condition: event.payload.lightspeed_prompt is defined
+    - name: Trigger playbook generation on anomaly incident
+      condition: >
+        event.message is defined and
+        "Generate a reviewable Ansible playbook" in event.message
       action:
         run_job_template:
-          name: "{{ controller_job_template_name }}"
-          organization: "{{ controller_organization_name }}"
+          name: "IMS - Parse and Dispatch Incident"
+          organization: "IMS Org"
           job_args:
             extra_vars:
-              lightspeed_prompt: "{{ event.payload.lightspeed_prompt }}"
-              lightspeed_wca_token: "{{ lightspeed_wca_token }}"
+              lightspeed_query: "{{ event.message }}"
+              lightspeed_token: "{{ lightspeed_token }}"
               input_lightspeed_url: "{{ input_lightspeed_url | default('https://c.ai.ansible.redhat.com/api/v0/ai/generations/') }}"
+
