@@ -22,6 +22,6 @@
           organization: "Default"
           job_args:
             extra_vars:
-              lightspeed_prompt: "{{ event.message }}"
+              lightspeed_prompt: "{{ event.body }}"
               input_lightspeed_url: "{{ input_lightspeed_url | default('http://aap-lightspeed-api.aap.svc.cluster.local:8000/api/v1/ai/chat/') }}"
 
