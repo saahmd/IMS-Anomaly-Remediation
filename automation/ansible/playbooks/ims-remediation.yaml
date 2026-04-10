@@ -86,8 +86,8 @@
 
     - name: Extract callback URL
       ansible.builtin.set_fact:
-        callback_url: "{{ parsed_envelope.metadata.callback_url }}"
-        correlation_id: "{{ parsed_envelope.metadata.correlation_id }}"
+        callback_url: "{{ parsed_envelope.callback_url }}"
+        correlation_id: "{{ parsed_envelope.correlation_id }}"
 
     - name: Extract playbook_yaml block
       ansible.builtin.set_fact:
