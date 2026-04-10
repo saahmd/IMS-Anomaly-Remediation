@@ -13,18 +13,12 @@
       action:
         debug:
           msg: "{{ event }}"
-    
-    - name: Debug body type
-      condition: event.body is defined
-      action:
-        debug:
-          msg: "Type check: {{ event.body | type_debug }} -- Value: {{ event.body }}"
-          
+              
     - name: Trigger playbook generation on anomaly incident
       condition: event.body is search("Generate a reviewable Ansible playbook", ignorecase=true)
       action:
         run_job_template:
-          name: "IMS - Parse and Dispatch Incident"
+          name: "IMS Remediation - Lightspeed Playbook Generator"
           organization: "IMS Org"
           job_args:
             extra_vars:
