@@ -89,9 +89,11 @@
         callback_url: "{{ parsed_envelope.callback_url }}"
         correlation_id: "{{ parsed_envelope.correlation_id }}"
 
-    - name: Extract playbook_yaml block
+    - name: Set callback and playbook facts
       ansible.builtin.set_fact:
-        extracted_playbook_yaml: "{{ parsed_envelope.playbook_yaml }}"
+        callback_url: "{{ parsed_envelope.metadata.callback_url }}"
+        correlation_id: "{{ parsed_envelope.metadata.correlation_id }}"
+        extracted_playbook_yaml: "{{ playbook_str }}"
 
     - name: Debug extracted values
       ansible.builtin.debug:
