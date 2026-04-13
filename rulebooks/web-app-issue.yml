@@ -4,7 +4,7 @@
   match_multiple_rules: true
   sources:
     - ansible.eda.kafka:
-        host: ims-release-kafka-kafka-bootstrap.ims-demo-lab.svc.cluster.local
+        host: ani-release-kafka-kafka-bootstrap.ani-data.svc.cluster.local
         port: 9092
         topic: aiops-ansible-playbook-generate-instruction
   rules:

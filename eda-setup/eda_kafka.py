@@ -28,7 +28,7 @@ class EDAKafkaError(RuntimeError):
 # ---------------------------------------------------------------------------
 POLICY_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "web_app_issue": {
-        "name": "Web App Issue - Kafka",
+        "name": "ANI Remediation",
         "rulebook": "rulebooks/web-app-issue.yml",
         "description": "Monitor Apache logs via Kafka and trigger AI workflow on shutdown events.",
         "event_types": ["kafka"],
