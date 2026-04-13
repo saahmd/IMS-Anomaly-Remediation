@@ -142,7 +142,7 @@
         method: POST
         headers:
           Content-Type: "application/json"
-          Authorization: "Bearer {{ control_plane_api_key | default('') }}"
+          Authorization: "Bearer {{ control_plane_api_key | default('demo-token') }}"
         body: "{{ callback_payload }}"
         body_format: json
         timeout: 60
