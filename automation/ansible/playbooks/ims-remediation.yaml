@@ -114,6 +114,43 @@
           provider_run_id: "{{ parsed_envelope.provider_run_id | default('NOT FOUND') }}"
           playbook_yaml_preview: "{{ extracted_playbook_yaml[:300] }}"
 
-    - name: Debug full parsed envelope (catch any unexpected keys)
+    - name: Build callback payload
+      ansible.builtin.set_fact:
+        callback_payload: >-
+          {{
+            {
+              'correlation_id': correlation_id,
+              'status': parsed_envelope.status | default('generated'),
+              'title': parsed_envelope.title | default('NOT FOUND'),
+              'description': parsed_envelope.description | default('NOT FOUND'),
+              'summary': parsed_envelope.summary | default('NOT FOUND'),
+              'expected_outcome': parsed_envelope.expected_outcome | default('NOT FOUND'),
+              'preconditions': parsed_envelope.preconditions | default('NOT FOUND'),
+              'playbook_yaml': extracted_playbook_yaml,
+              'playbook_ref': parsed_envelope.playbook_ref | default(''),
+              'action_ref': parsed_envelope.action_ref | default(''),
+              'provider_name': parsed_envelope.provider_name | default('Ansible Lightspeed'),
+              'provider_run_id': parsed_envelope.provider_run_id | default(''),
+              'error': None,
+              'metadata': {}
+            } | to_json
+          }}
+    
+    - name: POST generated playbook to callback URL
+      ansible.builtin.uri:
+        url: "{{ callback_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Bearer {{ control_plane_api_key | default('') }}"
+        body: "{{ callback_payload }}"
+        body_format: json
+        timeout: 60
+        status_code: [200, 201, 202, 204]
+      register: callback_response
+
+    - name: Debug callback response
       ansible.builtin.debug:
-        var: parsed_envelope
+        msg:
+          status: "{{ callback_response.status }}"
+          response: "{{ callback_response.json | default(callback_response.content | default('no body')) }}"
